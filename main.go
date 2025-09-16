@@ -21,7 +21,7 @@ func main() {
 
 	integrationID := os.Getenv("INTEGRATION_ID")
 	logger.Info(integrationID)
-	inputDir := os.Getenv("INPUT_DIR")
+	outputDir := os.Getenv("OUTPUT_DIR")
 
 	// get input files
 	sessionToken := os.Getenv("SESSION_TOKEN")
@@ -52,7 +52,7 @@ func main() {
 	fmt.Println(payload.Data)
 	for _, d := range payload.Data {
 		cmd := exec.Command("wget", "-v", "-O", d.FileName, d.Url)
-		cmd.Dir = inputDir
+		cmd.Dir = outputDir
 		var out strings.Builder
 		var stderr strings.Builder
 		cmd.Stdout = &out
