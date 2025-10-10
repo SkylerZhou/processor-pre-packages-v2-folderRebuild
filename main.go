@@ -51,13 +51,26 @@ func main() {
 	// copy files into input directory
 	fmt.Println(payload.Data)
 	for _, d := range payload.Data {
-		cmd := exec.Command("wget", "-v", "-O", d.FileName, d.Url)
-		cmd.Dir = outputDir
+
+		// Prepare the download path with directory structure
+		fullFilePath, err := getDownloadPath(outputDir, d.Path, d.FileName, logger)
+		if err != nil {
+			continue // Skip this file if directory creation failed
+		}
+
+		cmd := exec.Command("wget", "-v", "-O", fullFilePath, d.Url) // Note: we don't set cmd.Dir because we're using absolute paths
 		var out strings.Builder
 		var stderr strings.Builder
 		cmd.Stdout = &out
 		cmd.Stderr = &stderr
-		err := cmd.Run()
+		err = cmd.Run()
+
+		if err != nil {
+			logger.Error("Download failed",
+				slog.String("file", d.FileName),
+				slog.String("error", stderr.String()))
+			continue
+		}
 
 		// Print stdout content
 		stdoutContent := out.String()
@@ -69,11 +82,7 @@ func main() {
 		fmt.Println("Stderr output (verbose output):")
 		fmt.Println(stderrContent)
 
-		// If there was an error, log it
-		if err != nil {
-			logger.Error(err.Error(),
-				slog.String("error", stderrContent))
-		}
+		fmt.Printf("✓ Successfully downloaded: %s\n\n", fullFilePath)
 	}
 
 }
@@ -150,4 +159,30 @@ func getIntegration(apiHost string, integrationId string, sessionToken string) (
 	body, _ := io.ReadAll(res.Body)
 
 	return body, nil
+}
+
+// getDownloadPath constructs the full file path with directory structure and creates directories if needed
+func getDownloadPath(outputDir string, path []string, fileName string, logger *slog.Logger) (string, error) {
+	
+	// Construct the target directory path based on the folder structure
+	var targetDir string
+	if len(path) > 0 {
+		targetDir = outputDir + "/" + strings.Join(path, "/") 
+	} else {
+		targetDir = outputDir 
+	}
+	
+	// Create the directory structure if it doesn't exist
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		logger.Error("Failed to create directory structure",
+			slog.String("directory", targetDir),
+			slog.String("error", err.Error()))
+		return "", err 
+	}
+	
+	// Full path where the file will be saved
+	fullFilePath := targetDir + "/" + fileName 
+	fmt.Printf("Downloading to: %s\n", fullFilePath)
+	
+	return fullFilePath, nil
 }
